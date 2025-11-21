@@ -10,7 +10,9 @@ from functools import partial
 import operator
 from dotenv import load_dotenv
 
-from cache.dummydata import ModelCollect, ModelRecommend, ModelQna
+from cache.dummydata import ModelCollect
+from models.recommend.recommend import ModelRecommend, tool_rag_recommend
+from models.qna.qna import ModelQna, tool_rag_qna
 
 load_dotenv()
 
@@ -59,15 +61,8 @@ def tool_func(들어갈 인자들(타입 힌트 포함)) -> str:
     return string 
 """
 # tools 에는, 각각 이미지 처리 혹은 RAG를 수행하는 세가지 함수가 들어가야 함
-@tool
-def tool_func(query: str) -> str:
-    """
-    이 함수는 테스트를 위한 값을 그대로 반환하는 함수입니다.
-    반드시 해당 툴을 수행하세요.
-    """
-    return query
 
-tools = [tool_func]
+tools = [tool_rag_qna, tool_rag_recommend]
 
 ### 노드 선언 -----------------------------
 
@@ -154,13 +149,14 @@ def is_tool_calls(state: GraphState):
     last_message = state["messages"][-1]
 
     if last_message.tool_calls:
+        print("툴 호출")
         return "tool_call"
     else:
         return "done"
     
 def tool_back_to_caller(state: GraphState) -> str:
     current_state = state["current_stage"]
-    print('current_state: ', current_state)
+    print(state["messages"][-1])
 
     if current_state and current_state in ["collect", "recommend", "qna"]:
         return current_state

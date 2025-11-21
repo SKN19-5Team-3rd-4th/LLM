@@ -10,8 +10,8 @@ import operator
 from dotenv import load_dotenv
 
 from models.collect.collect import ModelCollect
-from models.recommend.recommend import ModelRecommend
-from models.qna.qna import ModelQna
+from models.recommend.recommend import ModelRecommend, tool_rag_recommend
+from models.qna.qna import ModelQna, tool_rag_qna
 
 load_dotenv()
 
@@ -44,7 +44,7 @@ def tool_func(들어갈 인자들(타입 힌트 포함)) -> str:
     return string 
 """
 # tools 에는, 각각 이미지 처리 혹은 RAG를 수행하는 세가지 함수가 들어가야 함
-tools = []
+tools = [tool_rag_recommend, tool_rag_qna]
 
 ### 노드 선언 -----------------------------
 

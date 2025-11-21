@@ -3,9 +3,11 @@
 # 3. tool recommend_rag(): 벡터DB에서 검색 후 반환
 # 4. (rag 후) get_response(): 검색된 데이터를 바탕으로 LLM이 응답 생성
 from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
 from langchain_core.messages import SystemMessage
 from modules.config import *
 from langchain_pinecone import PineconeVectorStore
+import json
 
 class ModelRecommend:
     def __init__(self, tools):
@@ -43,7 +45,7 @@ class ModelRecommend:
             
         model = ChatOpenAI(
             model='gpt-4o-mini',
-            temperature=1
+            temperature=1,
         ).bind_tools(self.tools)
             
         response = model.invoke(input_msg)
