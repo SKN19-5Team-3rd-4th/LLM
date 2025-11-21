@@ -26,24 +26,28 @@ def create_db(index_name):
     
 def _create_text_for_embedding(row):
     air_cond_text = '공기정화식물이다.' if row['isAirCond'] else ''
-    toxic_dog_text = '강아지에게 해롭다.' if row['isToxicToDog'] else ''
-    toxic_cat_text = '고양이에게 해롭다.' if row['isToxicToCat'] else ''
+    toxic_dog_text = '' if row['isToxicToDog'] else '강아지에게 안전하다.'
+    toxic_cat_text = '' if row['isToxicToCat'] else '고양이에게 안전하다.'
+    colors = " ".join(row['colors'])
 
     return (
-        f"꽃 이름: {row['flowNm']}, "
-        f"꽃말: {row['flowLang']}, "
-        f"특징: {row['fContent']}, "
-        f"용도: {row['fUse']}, "
-        f"재배법: {row['fGrow']}, "
-        f"종류: {row['fType']}. "
+        f"{row['flowLang']}, "
+        f"{row['fContent']}, "
+        f"물주기: {row['watering_frequency']}, "
+        f"난이도 {row['difficulty']}, "
+        f"{row['interior']}, "
+        f"{row['style']}, "
+        f"{row['fUse']}, "
+        f"{row['fGrow']}, "
+        f"{row['fType']}. "
         f"{air_cond_text} "
         f"{toxic_dog_text} "
-        f"{toxic_cat_text}"
+        f"{toxic_cat_text} "
+        f"{colors} "
     ).strip()
 
 
 def insert_rec_index(raw_data):
-    
     df = pd.DataFrame(raw_data)
     df['text_to_embed'] = df.apply(_create_text_for_embedding, axis=1)
     texts = df['text_to_embed'].tolist()
@@ -63,7 +67,6 @@ def insert_rec_index(raw_data):
 
 
 def insert_qna_index(raw_data):
-
     documents = []
     for item in raw_data:
         text = f"Q: {item['question']}\nA: {item['answer']}"
@@ -85,7 +88,6 @@ def insert_qna_index(raw_data):
 
 
 if __name__ == "__main__":
-
     print("데이터로드")
     rec_data = load_data(REC_FILE_PATH)
     qna_data = load_data(QNA_FILE_PATH)
@@ -97,5 +99,5 @@ if __name__ == "__main__":
     print("추천 데이터적재")
     insert_rec_index(rec_data)
     
-    print("식물 데이터적재")
+    print("Q&A 데이터적재")
     insert_qna_index(qna_data)
