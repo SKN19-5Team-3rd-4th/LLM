@@ -10,6 +10,7 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
 DATA_PATH = Path(__file__).resolve().parent.parent / 'datas'
 RAW_FILE_PATH = os.path.join(DATA_PATH, 'flower_data.json')
+NEW_FILE_PATH = os.path.join(DATA_PATH, 'new_data.json')
 REC_FILE_PATH = os.path.join(DATA_PATH, 'flower_preprocessed_data.json')
 QNA_FILE_PATH = os.path.join(DATA_PATH, 'post_preprocessed_data.json')
 REC_INDEX_NAME = "plant-recommend"
