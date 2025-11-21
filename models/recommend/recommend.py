@@ -48,13 +48,21 @@ class ModelRecommend:
             temperature=1,
         ).bind_tools(self.tools)
             
-        response = model.invoke(input_msg)
         recommend_result = ""
         
-        if response.content != '':
-            res_json = json.loads(response.content)
-            recommend_result = res_json['flowNm']
+        while True:
+            response = model.invoke(input_msg)
             
+            if response.content == '':
+                return response, recommend_result
+
+            try:
+                res_json = json.loads(response.content)
+                recommend_result = res_json['flowNm']
+                break
+            except:
+                continue                    
+        
         return response, recommend_result
 
 @tool
