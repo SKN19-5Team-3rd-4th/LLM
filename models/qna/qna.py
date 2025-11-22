@@ -1,4 +1,5 @@
 from langchain_core.messages import SystemMessage
+from langchain_core.tools import tool
 from langchain_pinecone import PineconeVectorStore
 from langchain_openai import ChatOpenAI
 from modules.config import * 
@@ -19,6 +20,7 @@ class ModelQna:
         prompt = """
         너는 식물에 대해 차분하게 상담해 주는 전문가이다.
         아래 형식을 반드시 지키되, 실제 상담사가 말하듯 자연스럽고 단정적인 말투로 작성한다.
+        모든 질문에 대한 답변은 tool을 사용하여 결과를 참고한다.
 
         ### 답변 방식 ###
         - 첫 문장은 사용자의 고민에 대한 핵심 답변을 한 줄로 요약한다. (채팅 응답처럼)
@@ -36,7 +38,7 @@ class ModelQna:
 
         model = ChatOpenAI(
             model="gpt-4o-mini", 
-            temperature=0.3
+            temperature=0.3,
         ).bind_tools(self.tools)
 
         response = model.invoke(input_msg)
