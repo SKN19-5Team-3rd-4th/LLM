@@ -9,9 +9,9 @@ from functools import partial
 import operator
 from dotenv import load_dotenv
 
-from models.collect.collect import ModelCollect
-from models.recommend.recommend import ModelRecommend, tool_rag_recommend
-from models.qna.qna import ModelQna, tool_rag_qna
+from modules.collect import ModelCollect
+from modules.recommend import ModelRecommend, tool_rag_recommend
+from modules.qna import ModelQna, tool_rag_qna
 
 load_dotenv()
 
@@ -29,11 +29,26 @@ class GraphState(TypedDict):
     # None: 아무 행동도 하지 않음, Skip: 다음 단계로, Continue: 추천 만족, Retry: 추천 다시 받기, Restart: 처음부터 재시작, QnA: QnA로 이동
     user_action: Literal["None", "Skip", "Continue", "Retry", "Restart", "QnA", "Exit"]
 
-    picture_exist: Optional[str]
 
 initial_state = {
-    "messages": []
-
+    "messages": [AIMessage(content="안녕하세요. AI입니다.")],
+    "current_stage": "collect",
+    "user_action": "None",
+    "collected_data": {
+                "purpose": None,            
+                "preferred_style": None,    
+                "preferred_color": None,
+                "plant_type": None,
+                "season": None,
+                "humidity": None,
+                "has_dog": None,
+                "has_cat": None,
+                "isAirCond": None,
+                "watering_frequency": None,
+                "user_experience": None,
+                "emotion": None
+            },
+    "recommend_result": " "
 }
 ### tools 선언 ---------------------------
 # tool 함수 선언
@@ -49,22 +64,13 @@ tools = [tool_rag_recommend, tool_rag_qna]
 ### 노드 선언 -----------------------------
 
 def node_collect(state: GraphState, collector: ModelCollect):
-    response, collected_data = collector.get_response(state["messages"], state["collected_data"])   # 어떤 정보를 전달했는지 알아야 하니까 collected_data도 같이 전달
-    picture = collector.get_picture()   # 아마 get_picture에서 picture를 저장하고 해당 경로를 전달해야 할듯 (str)
-    if picture is not None:
-        return {
-            "current_stage" : "collect",
-            "messages": [response],                      # 사용자에게 보여줄 질문
-            "picture_exist": picture,                    # 사진이 있다면 사진의 저장 경로
-            "collected_data": collected_data,            # 업데이트된 새로운 정보 딕셔너리
-        }
-    else:
-        return {
-            "current_stage" : "collect",
-            "messages": [response],
-            "picture_exist": "None",
-            "collected_data": collected_data,
-        }
+    response, message, collected_data = collector.get_response(state["messages"], state["collected_data"])  # 어떤 정보를 전달했는지 알아야 하니까 collected_data도 같이 전달
+    
+    return {
+        "current_stage" : "collect",
+        "messages": [response],
+        "collected_data": collected_data,
+    }
 
 def node_recommend(state: GraphState, recommender: ModelRecommend):
 
@@ -107,7 +113,14 @@ def main_router(state: GraphState):
     if action == "Exit":
         return "exit"
     
+    if action == "QnA":
+        return "qna"
+    
+    
     if stage == "collect":
+        if action == "Continue":
+            return "recommend"
+        
         if ModelCollect.is_data_enough(state["collected_data"]):
             return "recommend"
         else:
@@ -116,6 +129,7 @@ def main_router(state: GraphState):
     elif stage == "recommend":
         if action == "Continue":
             return "exit"
+        
         elif action == "QnA":
             return "qna"
         else:   # action == "Retry"
@@ -136,7 +150,7 @@ def is_tool_calls(state: GraphState):
         return "done"
     
 def tool_back_to_caller(state: GraphState) -> str:
-    current_state = state.get("current_state")
+    current_state = state.get("current_stage")
 
     if current_state and current_state in ["collect", "recommend", "qna"]:
         return current_state
@@ -153,12 +167,13 @@ model_qna = ModelQna(tools)
 workflow = StateGraph(GraphState)
 
 workflow.add_node("collect", partial(node_collect, collector=model_collect))
-workflow.add_node("recommend", partial(node_collect, recommender=model_recommend))
-workflow.add_node("qna", partial(node_collect, chatbot=model_qna))
+workflow.add_node("recommend", partial(node_recommend, recommender=model_recommend))
+workflow.add_node("qna", partial(node_qna, chatbot=model_qna))
 workflow.add_node("exit", node_end_state)
 workflow.add_node("rag_tool", ToolNode(tools))
 
 workflow.add_edge("exit", END)
+workflow.add_edge("collect", END)
 
 workflow.add_conditional_edges(
     START,
@@ -168,15 +183,6 @@ workflow.add_conditional_edges(
         "recommend": "recommend",
         "qna": "qna",
         "exit": "exit"
-    }
-)
-
-workflow.add_conditional_edges(
-    "collect",
-    is_tool_calls,
-    {
-        "tool_call": "rag_tool",
-        "done": END,
     }
 )
 
@@ -223,26 +229,32 @@ def run_chat_loop(app, memory: MemorySaver, initial_state: dict):
     while True:
         current_state = response
         message = current_state["messages"][-1]
+        collected_data = current_state["collected_data"]
 
         if current_state["current_stage"] == "exit":
             print("종료합니다...")
             break
 
         print("="*30)
-        print(f"채팅 시작: 현재 작업 {current_state["current_stage"]}")
-        print(f"AI   : {message}")
+        print(f"채팅 시작: 현재 작업 {current_state['current_stage']}")
+        print(f"AI   : {message.content}")
         print("="*30)
         user_input = input("User : ")
         action = "None"
 
         if user_input.lower() == "종료":
             action = "Exit"
+        elif user_input.lower() == "qna":
+            action = "QnA"
+            user_input = "안녕? 자기소개 해줘"
+        elif user_input.lower() == "next":
+            action = "Continue"
+            user_input = "추천해줘"
 
         input_delta = {
             "messages": [HumanMessage(content=user_input)],
             "user_action": action,
         }
-
         response = app.invoke(input_delta, config=config)
 ### -----------------------------------
 
