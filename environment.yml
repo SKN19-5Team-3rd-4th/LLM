@@ -7,14 +7,19 @@ dependencies:
   - python=3.10
   - pip
   - pip:
+      - openai
+      - pinecone
       - langchain
       - langgraph
-      - pydantic
-      - openai
-      - langchain-core
       - langchain-community
-      - faiss-cpu
-      - uvicorn
-      - fastapi
-      - pillow           
-      - python-dotenv    
+      - langchain-core
+      - langchain-openai
+      - langchain-pinecone
+      - python-dotenv
+      - pydantic
+      - tiktoken
+      - requests
+      - pandas
+      - numpy
+      - tqdm
+      - emoji
