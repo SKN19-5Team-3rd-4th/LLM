@@ -1,11 +1,16 @@
-from dotenv import load_dotenv
-import json
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
-from config import RAW_FILE_PATH, NEW_FILE_PATH, REC_FILE_PATH
-
+from langchain_openai import ChatOpenAI
+from config import RAW_FILE_PATH, NEW_FILE_PATH, REC_FILE_PATH, QNA_RAW_FILE_PATH, QNA_FILE_PATH
+from dotenv import load_dotenv
+import pandas as pd 
+import json
 load_dotenv()
 
+
+#----------------------------------------------------------------------------------------------
+# 1) 식물 추천 데이터 전처리
+# RAW_FILE_PATH 로드 → 정보생성 → NEW_FILE_PATH 저장 → 정보병합 → REC_FILE_PATH 저장 → RAG 활용
+#----------------------------------------------------------------------------------------------
 def supply_plants_data():
     with open(RAW_FILE_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -83,6 +88,19 @@ def merge_data():
         json.dump(merged, f, ensure_ascii=False, indent=2)
     
 
+#----------------------------------------------------------------------------------------------
+# 2) 식물 커뮤니티 게시글 데이터 전처리
+# QNA_RAW_FILE_PATH 로드 → 정제 → QNA_FILE_PATH 저장 → RAG 활용
+#----------------------------------------------------------------------------------------------
+def clean_qna_data():
+
+    with open(QNA_RAW_FILE_PATH, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    pass
+
+
 if __name__ == "__main__":
     supply_plants_data()
     merge_data()
+    clean_qna_data()

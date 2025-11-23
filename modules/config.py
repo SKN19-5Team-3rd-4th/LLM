@@ -15,6 +15,7 @@ DATA_PATH = Path(__file__).resolve().parent.parent / 'datas'
 # 원본 데이터
 RAW_FILE_PATH = DATA_PATH / 'flower_data.json'
 NEW_FILE_PATH = DATA_PATH / 'new_data.json'
+QNA_RAW_FILE_PATH = DATA_PATH / 'post.json'
 
 # 벡터 DB 적재 데이터
 REC_FILE_PATH = DATA_PATH / 'flower_preprocessed_data.json'
