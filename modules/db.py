@@ -73,7 +73,7 @@ class PineconeRagIngestor(PineconeManager):
     def load_data(self, file_path):
         with open(file_path, "r", encoding="utf-8") as f:
             raw_data = json.load(f)        
-        self.df = pd.DataFrame(raw_data[:7])  
+        self.df = pd.DataFrame(raw_data)  
         print(f"[INFO] {len(self.df)}건 데이터 로드 완료")
         return self.df
     
