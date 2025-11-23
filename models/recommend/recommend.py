@@ -42,8 +42,8 @@ class ModelRecommend:
         input_msg = [system_msg] + messages
             
         model = ChatOpenAI(
-            model='gpt-4o-mini',
-            temperature=1,
+            model='gpt-4o',
+            temperature=1
         ).bind_tools(self.tools)
             
         recommend_result = ""

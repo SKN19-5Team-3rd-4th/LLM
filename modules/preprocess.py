@@ -44,7 +44,7 @@ def supply_plants_data():
 
     model = ChatOpenAI(
             model='gpt-4o-mini',
-            temperature=1,
+            temperature=1
     )
 
     chain = prompt | model
