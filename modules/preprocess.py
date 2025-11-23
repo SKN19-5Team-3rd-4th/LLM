@@ -107,18 +107,15 @@ def clean_qna_data():
     df = df.drop_duplicates(['content']).query("channel == '식물Q&A' and author != '그로로알림이'").reset_index(drop=True)
 
     # 게시글 id 생성 및 코멘츠 댓글 {} > row 분리
-    list_cols = [col for col in df.columns if df[col].apply(lambda x: isinstance(x, list)).any()]
-
-    for col in list_cols:
-        df = df.explode(col)    
-    df = df.reset_index(drop=True)   
-
+    df = df.explode('comments').reset_index(drop=True)   
     df['post_id'] = df['post_url'].str.split('/').str[-1]
+    df['comments_id'] = df.groupby(['post_url']).cumcount()+1
     df['comments'] = df['comments'].apply(lambda x: x if not 'content' in str(x) else x['content'])
     df = df.drop(['author', 'post_url'], axis=1)
 
     # 해시태그 합치기 f"#태그 #태그"
-    df = df.groupby(['post_id', 'channel', 'content', 'comments', 'date'], dropna=False)['hashtags']\
+    df = df.explode('hashtags').reset_index(drop=True)  
+    df = df.groupby(['post_id', 'channel', 'content', 'comments', 'comments_id', 'date'], dropna=False)['hashtags']\
         .apply(lambda x: ' '.join(f"#{v}" for v in sorted(set(x.dropna())))).reset_index()
 
     # 텍스트 정제 
@@ -139,8 +136,12 @@ def clean_qna_data():
     df['content'] = df['content'].apply(clean_text)
     df['comments'] = df['comments'].apply(clean_text)
 
+    # 댓글 순서 유지 
+    df = df.sort_values(by=['post_id', 'comments_id'],key=lambda x:x.astype(int)).reset_index(drop=True)
+    df['comments'] = "[COMMENT" + df['comments_id'].astype(str) + "] " + df['comments']
+
     # 본문/댓글 정제 내용 병합
-    df_comment = df.groupby('post_id')['comments'].agg(lambda x: '\n[COMMENT]'.join(x.astype(str))).reset_index()
+    df_comment = df.groupby('post_id')['comments'].agg(lambda x: '\n'.join(x.astype(str))).reset_index()
     df_content = df.drop_duplicates('post_id').reset_index(drop=True)
     df_merge = df_content.merge(df_comment, on='post_id', suffixes=('_drop', ''))
     df_merge = df_merge.drop(columns=df_merge.filter(regex='_drop$').columns)
