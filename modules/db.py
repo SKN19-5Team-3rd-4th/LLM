@@ -125,7 +125,19 @@ class PineconeRagIngestor(PineconeManager):
         
         # 적재
         insert_data = [{'id':i, 'values':v, 'metadata':m} for i, v, m in zip(id_, vector_, metadata_)]
-        self.INDEX.upsert(vectors=insert_data, namespace=f'{index_name}-{self.upsert_dt}')
+
+        # 파인콘 한번에 4MB 이상 request 보내면 거부
+        def batch(iterable, n=100):
+            for idx in range(0, len(iterable), n):
+                yield iterable[idx: idx + n]
+
+        for idx, batch_data in enumerate(batch(insert_data, 100)):
+            self.INDEX.upsert(
+                vectors=batch_data,
+                namespace=f'{index_name}-{self.upsert_dt}'
+            )
+            print(f"[INFO] Batch {idx+1}")
+
         print(f"[INFO] {index_name} | {len(insert_data)}건 적재 완료")
 
 
