@@ -12,6 +12,9 @@ import warnings
 from pyfiglet import figlet_format
 import json
 import streamlit as st
+import requests
+from PIL import Image
+import io
 
 from modules.collect import ModelCollect
 from modules.recommend import ModelRecommend, tool_rag_recommend
@@ -82,7 +85,6 @@ def node_recommend(state: GraphState, recommender: ModelRecommend):
     # collected_data: dict         # 사용자에게서 모은 데이터(정보)를 저장하는 딕셔너리
     # recommend_result: List[str]  # 사용자에게 추천한 결과(해당 추천 결과는 재추천할때에 고려하지 않게 하기 위함)
 
-    print(type(response))
 
     return {
         "current_stage" : "recommend",
@@ -256,12 +258,20 @@ if not current_state_snapshot.values:
         "current_stage": "collect",
         "user_action": "None",
         "collected_data": {
-            "purpose": None, "preferred_style": None, "preferred_color": None,
-            "plant_type": None, "season": None, "humidity": None,
-            "has_dog": None, "has_cat": None, "isAirCond": None,
-            "watering_frequency": None, "user_experience": None, "emotion": None
-        },
-        "recommend_result": []
+                    "purpose": None,            
+                    "preferred_style": None,    
+                    "preferred_color": None,
+                    "plant_type": None,
+                    "season": None,
+                    "humidity": None,
+                    "has_dog": None,
+                    "has_cat": None,
+                    "isAirCond": None,
+                    "watering_frequency": None,
+                    "user_experience": None,
+                    "emotion": None
+                },
+        "recommend_result": "칼랑코에"
     }
     # 초기 실행으로 상태 설정
     app.invoke(initial_state, config=config)
@@ -303,10 +313,10 @@ def parse_ai_content(content):
     if isinstance(content, str) and content.startswith('{'):
         try:
             data = json.loads(content)
-            if "assistant_message" in data: return data["assistant_message"]
-            if "response" in data: return data["response"]
+            if "assistant_message" in data: return data["assistant_message"], None
+            if "response" in data: return data["response"], data["flowNm"]
         except: pass
-    return content
+    return content, None
 
 # 히스토리 출력
 for msg in messages:
@@ -315,7 +325,7 @@ for msg in messages:
             st.write(msg.content)
     elif isinstance(msg, AIMessage):
         if msg.content:
-            text = parse_ai_content(msg.content)
+            text, _ = parse_ai_content(msg.content)
             with st.chat_message("assistant", avatar="🌿"):
                 st.write(text)
 
@@ -354,7 +364,32 @@ if user_input := st.chat_input("메시지를 입력하세요..."):
             # 마지막 응답 출력
             last_msg = result["messages"][-1]
             if isinstance(last_msg, AIMessage):
-                st.write(parse_ai_content(last_msg.content))
+                response, flowNm = parse_ai_content(last_msg.content)
+                if flowNm is not None:
+                    with open("datas/flower_preprocessed_data.json", "r", encoding="utf-8") as f:
+                        flower_list = json.load(f)
+
+                    target = next((item for item in flower_list if item.get("flowNm") == flowNm), None)
+
+                    if target is None:
+                        st.warning(f"'{flowNm}' 데이터가 없습니다.")
+                    else:
+                        image_url = target.get("imgUrl1")
+
+                        if not image_url:
+                            st.warning(f"'{flowNm}' 데이터에 이미지 URL이 없습니다.")
+                        else:
+                            # 3. 이미지 다운로드
+                            response_img = requests.get(image_url)
+                            image_data = response_img.content
+
+                            # 4. 이미지 객체 변환
+                            pil_img = Image.open(io.BytesIO(image_data))
+
+                            # 5. Streamlit에 출력
+                            st.image(pil_img, caption=flowNm)
+                st.write(response)
+                
             
             # 상태 갱신을 위해 리런 (필수는 아니지만 UI 동기화 확실함)
             # st.rerun()
