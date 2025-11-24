@@ -8,6 +8,9 @@ from typing import TypedDict, Annotated, Optional, Literal, List
 from functools import partial
 import operator
 from dotenv import load_dotenv
+import warnings
+from pyfiglet import figlet_format
+import json
 
 from modules.collect import ModelCollect
 from modules.recommend import ModelRecommend, tool_rag_recommend
@@ -15,7 +18,6 @@ from modules.qna import ModelQna, tool_rag_qna
 
 load_dotenv()
 
-import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -149,7 +151,6 @@ def is_tool_calls(state: GraphState):
     last_message = state["messages"][-1]
 
     if last_message.tool_calls:
-        print("툴 호출")
         return "tool_call"
     else:
         return "done"
@@ -157,7 +158,11 @@ def is_tool_calls(state: GraphState):
 def tool_back_to_caller(state: GraphState) -> str:
     current_state = state.get("current_stage")
 
-    print("RAG 결과: ", state["messages"][-1])
+    if current_state == "recommend":
+        print(f"[ToolMessages] [RAG] [Pinecone Index name is plant-rec]")
+    elif current_state == "qna":
+        print(f"[ToolMessages] [RAG] [Pinecone Index name is plant-qna]")
+    print(state["messages"][-1])
 
     if current_state and current_state in ["collect", "recommend", "qna"]:
         return current_state
@@ -233,19 +238,53 @@ def run_chat_loop(app, memory: MemorySaver, initial_state: dict):
 
     response = app.invoke(initial_state, config=config)
 
+    print("\n"*5)
+    print(figlet_format("PLANT", font="roman"))
+
     while True:
         current_state = response
         message = current_state["messages"][-1]
         collected_data = current_state["collected_data"]
 
+        print("\n", "="*80, "\n")
         if current_state["current_stage"] == "exit":
             print("종료합니다...")
             break
+        elif current_state['current_stage'] == 'collect':
+            null_count = sum(1 for v in collected_data.values() if v is None)
+            process = (len(collected_data.values()) - null_count)*100 / len(collected_data.values())
 
-        print("="*30)
-        print(f"채팅 시작: 현재 작업 {current_state['current_stage']}")
+            print(f"[INFO] [Work Stage] 정보 수집 (collect)")
+            print(f"[INFO] [AIMessages] 정보 수집률: {int(process)}%")
+        elif current_state['current_stage'] == 'recommend':
+            print(f"[INFO] [Work Stage] 추천 (recommend)")
+        else:
+            print(f"[INFO] [Work Stage] 상담 (QnA)")
         print(f"AI   : {message.content}")
-        print("="*30)
+        print("\n", "-"*80, "\n")
+        print("[대화창]")
+        for message in current_state["messages"][1:]:
+            if message.content == "안녕? 자기소개 해줘" or message.content == "추천해줘":
+                continue
+            else:
+                if isinstance(message, AIMessage) and (not hasattr(message, 'tool_calls') or not message.tool_calls):
+
+                    if message.content.startswith('{'):
+                        data_dict = json.loads(message.content)
+                        if "assistant_message" in data_dict:
+                            response = data_dict["assistant_message"]
+                            print(f"AI(플랜이) : {response}")
+                        elif "response" in data_dict:
+                            response = data_dict["response"]
+                            print(f"AI(플랜이) : {response}")
+                    else:
+                        print(f"AI(플랜이) : {message.content}")
+
+                elif isinstance(message, HumanMessage):
+                    print(f"User({thread_id_01}) : {message.content}")
+        print("\n", "="*80, "\n")
+
+
         user_input = input("User : ")
         action = "None"
 
@@ -255,6 +294,7 @@ def run_chat_loop(app, memory: MemorySaver, initial_state: dict):
             action = "QnA"
             user_input = "안녕? 자기소개 해줘"
         elif user_input.lower() == "next":
+            print(f"[INFO] User Action is next")
             action = "Continue"
             user_input = "추천해줘"
 
