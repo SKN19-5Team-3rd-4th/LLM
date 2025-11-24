@@ -9,7 +9,6 @@ from functools import partial
 import operator
 from dotenv import load_dotenv
 import warnings
-from pyfiglet import figlet_format
 import json
 import streamlit as st
 import requests
@@ -63,7 +62,7 @@ initial_state = {
 ### tools 선언 ---------------------------
 # tool 함수 선언
 
-# tools 에는, 각각 이미지 처리 혹은 RAG를 수행하는 세가지 함수가 들어가야 함
+# tools 에는, 각각 RAG를 수행하는 두가지 함수가 들어가야 함
 tools = [tool_rag_recommend, tool_rag_qna]
 
 ### 노드 선언 -----------------------------
@@ -219,9 +218,11 @@ workflow.add_conditional_edges(
     }
 )
 
+### streamlit -----------------------
+
 # 메시지 파싱 함수
 def parse_ai_content(content):
-    if isinstance(content, str) and content.startswith('{'):
+    if isinstance(content, str) and content.startswith('{'):    # 메시지가 json 형태라면 딕셔너리로 변환
         try:
             data = json.loads(content)
             if "assistant_message" in data: return data["assistant_message"], None
@@ -260,7 +261,6 @@ if st.session_state.is_collected is False:
         "emotion": ["행복/기쁨", "차분함/힐링", "우울/위로", "피곤/활력필요"],
     }
 
-    # 1. 폼(Form) 시작: 이 블록 안의 위젯들은 즉시 반응하지 않습니다.
     with st.form(key="plant_preference_form"):
         collected_data = {
                 "purpose": None,            
@@ -278,10 +278,8 @@ if st.session_state.is_collected is False:
         }
         st.caption("일부 항목을 선택한 후 하단의 버튼을 눌러주세요.")
 
-        # 3. 화면 레이아웃 구성
         col1, col2 = st.columns(2)
 
-        # 헬퍼 함수들 (폼 내부에서 작동)
         def get_selection(label, options_list):
             selection = st.selectbox(label, ["선택하세요"] + options_list)
             return selection if selection != "선택하세요" else None
@@ -292,17 +290,15 @@ if st.session_state.is_collected is False:
             elif selection == "아니오": return False
             else: return None
 
-        # --- 컬럼 1 입력 ---
         with col1:
-            st.subheader("🏠 환경 및 목적")
+            st.subheader("환경 및 목적")
             collected_data["purpose"] = get_selection("구매 목적", options["purpose"])
             collected_data["season"] = get_selection("현재 계절", options["season"])
             collected_data["humidity"] = get_selection("설치 공간 습도", options["humidity"])
             collected_data["user_experience"] = get_selection("식물 키우기 경험", options["experience"])
 
-        # --- 컬럼 2 입력 ---
         with col2:
-            st.subheader("🎨 취향 및 경험")
+            st.subheader("취향 및 경험")
             collected_data["preferred_style"] = get_selection("선호하는 스타일", options["style"])
             collected_data["preferred_color"] = get_selection("선호하는 색상", options["color"])
             collected_data["plant_type"] = get_selection("원하는 식물 종류", options["type"])
@@ -310,10 +306,7 @@ if st.session_state.is_collected is False:
 
         st.divider()
 
-        # 2. 폼 제출 버튼 (Form Submit Button)
-        # 이 버튼을 눌러야만 위의 선택값들이 확정되고 스크립트가 Rerun 됩니다.
-        submitted = st.form_submit_button("식물 추천 받기 🪴")
-    # 4. 제출 후 로직 처리 (폼 블록 바깥에서 처리)
+        submitted = st.form_submit_button("식물 추천 받기")
     if submitted:
         st.session_state.collected_data = collected_data
         st.session_state.is_collected = True
@@ -331,16 +324,9 @@ else:
         memory = MemorySaver()
         st.session_state.app = workflow.compile(checkpointer=memory)
 
-
-    # ==========================================
-    # [4] Streamlit UI 시작
-    # ==========================================
-
     st.set_page_config(page_title="PLANT AI", page_icon="🌿")
 
-    st.title("🌿 PLANT AI")
-    st.caption("나만의 식물 추천 파트너 (LangGraph Powered)")
-
+    st.title("A.P.T(AI Plant Teller)")
 
 
     app = st.session_state.app
@@ -353,8 +339,6 @@ else:
     # 초기 메시지/상태가 없으면 초기화
     current_state_snapshot = app.get_state(config)
     if not current_state_snapshot.values:
-        # 초기 상태 주입
-        # 초기 실행으로 상태 설정
         app.invoke(initial_state, config=config)
         
         st.rerun()
@@ -365,11 +349,9 @@ else:
     current_stage = state_values.get("current_stage", "collect")
     collected_data = state_values.get("collected_data", {})
 
-    # ==========================================
-    # [사이드바]
-    # ==========================================
+
     with st.sidebar:
-        st.header("📊 진행 상황")
+        st.header("진행 상황")
         stage_map = {"collect": "정보 수집", "recommend": "추천", "qna": "상담", "exit": "종료"}
         st.info(f"현재 단계: **{stage_map.get(current_stage, current_stage)}**")
 
@@ -378,9 +360,6 @@ else:
             st.session_state.thread_id = f"user_{int(st.session_state.thread_id.split('_')[1]) + 1}"
             st.rerun()
 
-    # ==========================================
-    # [메인] 채팅창
-    # ==========================================
 
     # 히스토리 출력
     for msg in messages[1:]:
@@ -416,9 +395,8 @@ else:
                                 st.image(pil_img, caption=flowNm)
                     st.write(text)
 
-    # ==========================================
-    # [입력] 처리
-    # ==========================================
+
+
     if user_input := st.chat_input("메시지를 입력하세요..."):
         # 사용자 입력 즉시 표시
         with st.chat_message("user"):
@@ -437,7 +415,6 @@ else:
             action = "Continue" # 혹은 로직에 따라 Skip
             actual_input = "추천해줘"
 
-            # LangGraph 입력 페이로드
         input_payload = {
             "messages": [HumanMessage(content=actual_input)],
             "user_action": action
@@ -466,17 +443,11 @@ else:
                             if not image_url:
                                 st.warning(f"'{flowNm}' 데이터에 이미지 URL이 없습니다.")
                             else:
-                                # 3. 이미지 다운로드
                                 response_img = requests.get(image_url)
                                 image_data = response_img.content
 
-                                # 4. 이미지 객체 변환
                                 pil_img = Image.open(io.BytesIO(image_data))
 
-                                # 5. Streamlit에 출력
                                 st.image(pil_img, caption=flowNm)
                     st.write(response)
                     
-                
-                # 상태 갱신을 위해 리런 (필수는 아니지만 UI 동기화 확실함)
-                # st.rerun()
