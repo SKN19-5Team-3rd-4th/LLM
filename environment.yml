@@ -1,1 +1,25 @@
 name: project3
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - openai
+      - pinecone
+      - langchain
+      - langgraph
+      - langchain-community
+      - langchain-core
+      - langchain-openai
+      - langchain-pinecone
+      - python-dotenv
+      - pydantic
+      - tiktoken
+      - requests
+      - pandas
+      - numpy
+      - tqdm
+      - emoji
