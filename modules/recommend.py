@@ -8,6 +8,8 @@ from langchain_pinecone import PineconeVectorStore
 from langchain_openai import ChatOpenAI
 from modules.config import REC_INDEX_NAME, pc, embeddings
 import json
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+import torch
 from datetime import datetime
 
 class ModelRecommend:
@@ -104,6 +106,42 @@ class ModelRecommend:
         
         return [response], recommend_result
 
+
+def rerank(query, documents):
+    model_path = "Dongjin-kr/ko-reranker"
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = AutoModelForSequenceClassification.from_pretrained(model_path)
+    
+    texts = [
+        doc.page_content if hasattr(doc, "page_content") 
+        else doc.get("text") if isinstance(doc, dict) 
+        else doc
+        for doc in documents
+    ]
+
+    pairs = [[query, text] for text in texts]
+    
+    inputs = tokenizer(
+        pairs, 
+        padding=True, 
+        truncation=True, 
+        return_tensors='pt'
+    )
+    
+    with torch.no_grad():
+        outputs = model(**inputs)
+        scores = outputs.logits.squeeze(-1)
+    
+    ranked = sorted(
+        list(zip(documents, scores.cpu().tolist())),
+        key=lambda x: x[1],
+        reverse=True
+    )
+    
+    return ranked
+
+
+
 @tool
 def tool_rag_recommend(query: str) -> str:
     """식물 추천 전용 RAG 도구"""
@@ -114,7 +152,20 @@ def tool_rag_recommend(query: str) -> str:
         embedding=embeddings
     )
     
-    retriever = vector_store.as_retriever(search_kwargs={"k": 1})
-    retrievals = retriever.batch([query])
+    retriever = vector_store.as_retriever(search_kwargs={"k": 5})
     
-    return str(retrievals[0])
+    # retrievals: [[doc1, doc2, ...]]
+    retrievals = retriever.batch([query])[0]
+
+    ranked = rerank(query, retrievals)
+
+    best_doc, best_score = ranked[0]
+
+    return str({
+        "best": best_doc.page_content if hasattr(best_doc, "page_content") else str(best_doc),
+        "score": best_score,
+        "all_ranked": [
+            (d.page_content if hasattr(d, "page_content") else str(d), s) 
+            for d, s in ranked
+        ]
+    })
