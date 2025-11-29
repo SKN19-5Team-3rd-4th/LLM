@@ -107,7 +107,7 @@ class ModelRecommend:
         return [response], recommend_result
 
 
-def rerank(query, documents):
+def _rerank(query, documents):
     model_path = "Dongjin-kr/ko-reranker"
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     model = AutoModelForSequenceClassification.from_pretrained(model_path)
@@ -141,9 +141,8 @@ def rerank(query, documents):
     return ranked
 
 
-
 @tool
-def tool_rag_recommend(query: str) -> str:
+def tool_rag_recommend(query) -> str:
     """식물 추천 전용 RAG 도구"""
     index = pc.Index(REC_INDEX_NAME)
 
@@ -151,21 +150,31 @@ def tool_rag_recommend(query: str) -> str:
         index=index,
         embedding=embeddings
     )
-    
-    retriever = vector_store.as_retriever(search_kwargs={"k": 5})
-    
-    # retrievals: [[doc1, doc2, ...]]
-    retrievals = retriever.batch([query])[0]
 
-    ranked = rerank(query, retrievals)
+    filter_conditions = {}
+
+    # 강아지 있을 경우, 독성 False만
+    if query.get("has_dog") == True:
+        filter_conditions["isToxicToDog"] = {"$eq": False}
+
+    # 고양이 있을 경우, 독성 False만
+    if query.get("has_cat") == True:
+        filter_conditions["isToxicToCat"] = {"$eq": False}
+
+    retriever = vector_store.as_retriever(
+        search_kwargs={
+            "k": 5,
+            "filter": filter_conditions
+        }
+    )   
+
+    retrievals = retriever.batch([str(query)])[0]
+
+    if not retrievals:
+        return str({"error": "검색 결과 없음", "filter_used": filter_conditions})
+
+    ranked = _rerank(str(query), retrievals)
 
     best_doc, best_score = ranked[0]
 
-    return str({
-        "best": best_doc.page_content if hasattr(best_doc, "page_content") else str(best_doc),
-        "score": best_score,
-        "all_ranked": [
-            (d.page_content if hasattr(d, "page_content") else str(d), s) 
-            for d, s in ranked
-        ]
-    })
+    return str(best_doc.page_content if hasattr(best_doc, "page_content") else str(best_doc))
