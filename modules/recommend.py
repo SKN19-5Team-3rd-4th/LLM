@@ -142,7 +142,7 @@ def _rerank(query, documents):
 
 
 @tool
-def tool_rag_recommend(query) -> str:
+def tool_rag_recommend(query : dict) -> str:
     """식물 추천 전용 RAG 도구"""
     index = pc.Index(REC_INDEX_NAME)
 

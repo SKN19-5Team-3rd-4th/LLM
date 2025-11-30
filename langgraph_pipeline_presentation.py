@@ -41,18 +41,16 @@ initial_state = {
     "current_stage": "collect",
     "user_action": "None",
     "collected_data": {
+                "room" : None,
                 "purpose": None,            
                 "preferred_style": None,    
                 "preferred_color": None,
-                "plant_type": None,
-                "season": None,
                 "humidity": None,
                 "has_dog": None,
                 "has_cat": None,
                 "isAirCond": None,
                 "watering_frequency": None,
                 "user_experience": None,
-                "emotion": None
             },
     "recommend_result": " "
 }
@@ -70,7 +68,7 @@ tools = [tool_rag_recommend, tool_rag_qna]
 ### 노드 선언 -----------------------------
 
 def node_collect(state: GraphState, collector: ModelCollect):
-    response, message, collected_data = collector.get_response(state["messages"], state["collected_data"])  # 어떤 정보를 전달했는지 알아야 하니까 collected_data도 같이 전달
+    response, collected_data = collector.get_response(state["messages"], state["collected_data"])  # 어떤 정보를 전달했는지 알아야 하니까 collected_data도 같이 전달
     
     return {
         "current_stage" : "collect",
@@ -256,6 +254,7 @@ def run_chat_loop(app, memory: MemorySaver, initial_state: dict):
 
             print(f"[INFO] [Work Stage] 정보 수집 (collect)")
             print(f"[INFO] [AIMessages] 정보 수집률: {int(process)}%")
+            print(collected_data)
         elif current_state['current_stage'] == 'recommend':
             print(f"[INFO] [Work Stage] 추천 (recommend)")
         else:
