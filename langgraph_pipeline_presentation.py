@@ -283,24 +283,33 @@ def run_chat_loop(app, memory: MemorySaver, initial_state: dict):
                     print(f"User({thread_id_01}) : {message.content}")
         print("\n", "="*80, "\n")
 
-
-        user_input = input("User : ")
-        action = "None"
+        if message.content != "정보 수집이 끝났습니다. 잠시만 기다려 주세요.":
+            user_input = input("User : ")
+            action = "None"
+        else:
+            user_input = "next"
+            action = "Continue"
 
         if user_input.lower() == "종료":    # 종료 누르면 종료
             action = "Exit"
         elif user_input.lower() == "qna":
             action = "QnA"
-            user_input = "안녕? 자기소개 해줘"
+            user_input = "next"
         elif user_input.lower() == "next":
             print(f"[INFO] User Action is next")
             action = "Continue"
-            user_input = "추천해줘"
+            user_input = "next"
 
-        input_delta = {
-            "messages": [HumanMessage(content=user_input)],
-            "user_action": action,
-        }
+        if user_input == "next":
+            input_delta = {
+                "user_action": action,
+            }
+
+        else:
+            input_delta = {
+                "messages": [HumanMessage(content=user_input)],
+                "user_action": action,
+            }
         
         response = app.invoke(input_delta, config=config)
 ### -----------------------------------

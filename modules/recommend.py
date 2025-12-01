@@ -71,7 +71,7 @@ class ModelRecommend:
             ### 설명 ###
             당신은 친절한 식물 전문가입니다. 한국어로 친절하게 답변하세요.
             반드시 JSON만 출력하세요. JSON 앞뒤에 설명, 문장, 코드블록, ``` 표시를 넣지 마세요.
-            키우는 식물과 관련된 결과는 반드시 RAG 검색 결과를 참고해서 반드시 조건에 맞는 식물 1가지를 추천하세요.
+            키우는 식물과 관련된 결과는 반드시 추천 RAG 검색 결과를 참고해서 반드시 조건에 맞는 식물 1가지를 추천하세요.
             꽃다발과 관련된 결과는 꽃 종류만 RAG로 판단하고 스스로 생각하여 추천하세요.
             **제외 또는 부정적인 단어가 섞인 정보와 관련된 식물은 절대 추천하지 않습니다.**
             **제외해야 하는 정보가 포함된 RAG 결과에 대해서는 다시 검색합니다.**
@@ -98,13 +98,16 @@ class ModelRecommend:
             
         recommend_result = ""
 
-        count = 1
+        count = 0
         
         while count < 4:
             count += 1
+            if count > 1 :
+                print(response)
             response = model.invoke(input_msg)
             
             if response.content == '':
+                response.tool_calls = [response.tool_calls[0]]
                 response.tool_calls[0]['name'] = 'tool_rag_recommend'
                 collected_data_dict = {}
                 collected_data_dict['query'] = collected_data

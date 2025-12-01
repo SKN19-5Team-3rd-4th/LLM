@@ -35,7 +35,7 @@ class ModelCollect:
         "watering_frequency": {
                          "question": "원하는 물 주기는?",
                          "choice": ["주 1회", "2주에 1회", "3주에 1회", "4주에 1회", "상관 없음"]},
-        "uesr_experience": {
+        "user_experience": {
                             "question": "원하는 식물 난이도?",
                             "choice": ["쉬움", "중간", "어려움", "상관 없음"]}
         
@@ -68,15 +68,23 @@ class ModelCollect:
                 if key == "has_dog_or_cat":
                     if "강아지" in data :
                         updated_data["has_dog"] = True
+                    else:
+                        updated_data["has_dog"] = False
                     if "고양이" in data :
                         updated_data["has_cat"] = True
+                    else:
+                        updated_data["has_cat"] = False
+                    
 
-                updated_data[key] = ', '.join(data)
+                else:
+                    updated_data[key] = ', '.join(data)
             else:
                 updated_data[key] = messages[-1].content
 
             keys = [k for k, v in updated_data.items() if v is None]
             if len(keys) > 0 :
+                if keys[0] == 'has_dog' or keys[0] == 'has_cat':
+                    keys[0] = 'has_dog_or_cat'
                 message = self.question_list[keys[0]]["question"]
             else :
                 message = "정보 수집이 끝났습니다. 잠시만 기다려 주세요."
