@@ -41,20 +41,18 @@ initial_state = {
     "current_stage": "collect",
     "user_action": "None",
     "collected_data": {
+                "room" : None,
                 "purpose": None,            
                 "preferred_style": None,    
                 "preferred_color": None,
-                "plant_type": None,
-                "season": None,
                 "humidity": None,
                 "has_dog": None,
                 "has_cat": None,
                 "isAirCond": None,
                 "watering_frequency": None,
                 "user_experience": None,
-                "emotion": None
             },
-    "recommend_result": " "
+    "recommend_result": "칼랑코에"
 }
 ### tools 선언 ---------------------------
 # tool 함수 선언
@@ -70,7 +68,7 @@ tools = [tool_rag_recommend, tool_rag_qna]
 ### 노드 선언 -----------------------------
 
 def node_collect(state: GraphState, collector: ModelCollect):
-    response, message, collected_data = collector.get_response(state["messages"], state["collected_data"])  # 어떤 정보를 전달했는지 알아야 하니까 collected_data도 같이 전달
+    response, collected_data = collector.get_response(state["messages"], state["collected_data"])  # 어떤 정보를 전달했는지 알아야 하니까 collected_data도 같이 전달
     
     return {
         "current_stage" : "collect",
@@ -88,7 +86,7 @@ def node_recommend(state: GraphState, recommender: ModelRecommend):
 
     return {
         "current_stage" : "recommend",
-        "messages": [response],
+        "messages": response,
         "recommend_result": recommend_result,
     }
 
@@ -162,7 +160,7 @@ def tool_back_to_caller(state: GraphState) -> str:
         print(f"[ToolMessages] [RAG] [Pinecone Index name is plant-rec]")
     elif current_state == "qna":
         print(f"[ToolMessages] [RAG] [Pinecone Index name is plant-qna]")
-    print(state["messages"][-1])
+    # print(state["messages"][-1])
 
     if current_state and current_state in ["collect", "recommend", "qna"]:
         return current_state
@@ -256,6 +254,7 @@ def run_chat_loop(app, memory: MemorySaver, initial_state: dict):
 
             print(f"[INFO] [Work Stage] 정보 수집 (collect)")
             print(f"[INFO] [AIMessages] 정보 수집률: {int(process)}%")
+            print(collected_data)
         elif current_state['current_stage'] == 'recommend':
             print(f"[INFO] [Work Stage] 추천 (recommend)")
         else:
@@ -284,24 +283,33 @@ def run_chat_loop(app, memory: MemorySaver, initial_state: dict):
                     print(f"User({thread_id_01}) : {message.content}")
         print("\n", "="*80, "\n")
 
-
-        user_input = input("User : ")
-        action = "None"
+        if message.content != "정보 수집이 끝났습니다. 잠시만 기다려 주세요.":
+            user_input = input("User : ")
+            action = "None"
+        else:
+            user_input = "next"
+            action = "Continue"
 
         if user_input.lower() == "종료":    # 종료 누르면 종료
             action = "Exit"
         elif user_input.lower() == "qna":
             action = "QnA"
-            user_input = "안녕? 자기소개 해줘"
+            user_input = "next"
         elif user_input.lower() == "next":
             print(f"[INFO] User Action is next")
             action = "Continue"
-            user_input = "추천해줘"
+            user_input = "next"
 
-        input_delta = {
-            "messages": [HumanMessage(content=user_input)],
-            "user_action": action,
-        }
+        if user_input == "next":
+            input_delta = {
+                "user_action": action,
+            }
+
+        else:
+            input_delta = {
+                "messages": [HumanMessage(content=user_input)],
+                "user_action": action,
+            }
         
         response = app.invoke(input_delta, config=config)
 ### -----------------------------------

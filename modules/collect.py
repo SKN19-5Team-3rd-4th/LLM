@@ -4,92 +4,94 @@ from langchain_openai import ChatOpenAI
 import json
 import streamlit as st
 
+collected_data = {
+                "room": "거실 / 거실의 빈 벽이 너무 심심해서 놓고 싶어",
+                "humidity": "건조",
+                "preferred_style": "미니멀",
+                "preferred_color": "따뜻한 색",
+                "has_dog": True,
+                "has_cat": False,
+                "isAirCond": True,
+                "watering_frequency": "주 1회",
+                "user_experience": "쉬움"
+            }
+
 class ModelCollect:
+    question_list = {
+        "room" : {"question" : "식물을 놓을 공간은 어디인가요?",
+                  "choice" : ["거실", "베란다", "침실", "사무실", "서재", "현관", "상업적 공간"]},
+        "purpose" : {"question" : "식물을 구매하려는 주요 목적이 무엇인가요?",
+                     "choice" : []},
+        "humidity" : {"question" : "공간의 환경은 어떤 편인가요?",
+                      "choice": ["습한 편", "건조한 편"]},
+        "preferred_style" : {"question" : "인테리어 스타일은 어떤 느낌인가요?",
+                             "choice": ["모던", "미니멀", "스칸디나비아", "전통", "빈티지", "내추럴", "레트로", "클래식"]},
+        "preferred_color" : {"question" : "선호하는 색상은 어떤 색상인가요?",
+                             "choice": ["무채색 계열", "따뜻한 색", "차가운 색", "선명한 색"]},
+        "has_dog_or_cat" : {"question" : "강아지나 고양이를 키우시나요?",
+                     "choice" : ["강아지", "고양이", "키우지 않음"]},
+        "isAirCond" : {"question" : "공기 정화가 가능한 식물을 원하시나요?",
+                       "choice" : ["예", "아니오"]},
+        "watering_frequency": {
+                         "question": "원하는 물 주기는?",
+                         "choice": ["주 1회", "2주에 1회", "3주에 1회", "4주에 1회", "상관 없음"]},
+        "user_experience": {
+                            "question": "원하는 식물 난이도?",
+                            "choice": ["쉬움", "중간", "어려움", "상관 없음"]}
+        
+    }
+
     def __init__(self, tools):        
         self.tools = tools   
 
     @staticmethod
     def is_data_enough(collected_data):
            null_count = sum(1 for v in collected_data.values() if v is None)
-           if len(collected_data.values()) - null_count >= len(collected_data.values()) // 2 :
+           if null_count == 0 :
                return True
            else:
                return False
 
     def get_response(self, messages, collected_data):
+        if len(messages) >= 2 :
+            key = None
+            for k, v in self.question_list.items():
+                if v["question"] == messages[-2].content:
+                    key = k
+                    break
+
+            data = [word for word in self.question_list[key]["choice"] if word in messages[-1].content.lower()]
+
+            updated_data = collected_data
+
+            if data:
+                if key == "has_dog_or_cat":
+                    if "강아지" in data :
+                        updated_data["has_dog"] = True
+                    else:
+                        updated_data["has_dog"] = False
+                    if "고양이" in data :
+                        updated_data["has_cat"] = True
+                    else:
+                        updated_data["has_cat"] = False
+                    
+
+                else:
+                    updated_data[key] = ', '.join(data)
+            else:
+                updated_data[key] = messages[-1].content
+
+            keys = [k for k, v in updated_data.items() if v is None]
+            if len(keys) > 0 :
+                if keys[0] == 'has_dog' or keys[0] == 'has_cat':
+                    keys[0] = 'has_dog_or_cat'
+                message = self.question_list[keys[0]]["question"]
+            else :
+                message = "정보 수집이 끝났습니다. 잠시만 기다려 주세요."
+        else : 
+            updated_data = collected_data
+            message = self.question_list["purpose"]["question"]
+
+        response = AIMessage(content=message)
         
-        prompt = f"""
-            다음과 같은 상황에 대해 반드시 json 형식으로 응답하세요.
-            당신은 식물 인테리어 추천 또는 식물 선물 추천을 위한 상담 챗봇입니다.  
-            당신의 목표는 아래 JSON 형식을 사용자와의 대화를 통해 하나씩 채워가는 것입니다.
-
-            현재까지 수집된 정보는 다음과 같습니다:
-            {collected_data}
-
-            ### 지침
-            1. JSON에서 아직 값이 null인 항목을 확인합니다.
-            2. 한 번의 턴에서는 정보를 채울수 있는 자연스러운 질문을 **한 가지** 합니다.
-            3. 모든 질문은 자연스러운 대화를 통해 이루어져야 하고, **최대한 여러개의 정보를 한번에 얻을 수 있는 질문**을 해야합니다.
-            4. 사용자의 답변을 기반으로 **한개 또는 여러개**의 해당 항목을 업데이트합니다.
-            5. **응답은 아래 출력 예시 형식 구조를 반드시 따라야 합니다**:
-
-            - "assistant_message":  
-            사용자의 답변을 반영하여 다음 질문을 하거나 대화를 이어가는 문장입니다.  
-            두 문장 이상으로 이루어져야 하며, 자연스러운 이야기의 흐름을 연결하며 마지막에 질문하도록 합니다.
-            (아직 채워야 할 항목이 있다면 질문을 계속하며, 모든 항목이 채워졌다면 전체 데이터를 요약하고 질문을 멈춥니다.)
-            예시 답안 : "카페 개업이라면 공간 분위기를 살리면서도 의미가 있는 식물이 좋습니다.  보통 카페에는 ‘성장과 번창’을 상징하는 식물이 많이 사용되는데요, 혹시 카페 분위기나 친구의 스타일도 알고 계신가요?"
-
-            - "updated_json":  
-            지금까지 수집된 모든 데이터를 포함하는 JSON 객체입니다.  
-            null이 아닌 값은 이전 사용자 답변을 기반으로 유지합니다.
-
-            ### 규칙
-            - JSON 값은 절대 임의로 추측하지 말고, 반드시 사용자 답변으로만 채웁니다.
-            - yes/no 형태 질문은 true 또는 false로 변환하여 저장합니다.
-            - 사용자 경험 수준이나 감정 등 주관적 답변도 사용자가 말한 표현을 그대로 저장합니다.
-            - **항상 "assistant_message"와 "updated_json"이 포함된 유효한 JSON 형태**로 반환해야 합니다.
-
-            ### 출력 예시 형식
-            {{
-            "assistant_message": "안녕하세요! 식물 추천을 도와드리겠습니다. 먼저, 어떤 용도로 식물을 추천받고 싶으신가요? 예를 들어, 집안 인테리어를 위한 것인지, 아니면 특별한 선물을 위한 것인지 말씀해 주세요.",
-            "updated_json": {{
-                "purpose": null, # 목적 (사용자의 입력 그대로)
-                "preferred_style": null, # 인테리어 스타일, 선호하는 스타일
-                "preferred_color": null, # 선호하는 색상
-                "plant_type": null, # 인테리어 시 선호하는 식물
-                "season": null, # 현재 계절
-                "humidity": null, # 습도
-                "has_dog": null, # 강아지를 키우는지
-                "has_cat": null, # 고양이를 키우는지
-                "isAirCond": null, # 공기 정화가 필요한지
-                "watering_frequency": null, # 물을 줄 수 있는 주기
-                "user_experience": null, # 기타 정보
-                "emotion": null # 담고 싶은 분위기나 감정
-            }}
-            }}
-        """
-        
-        system_msg = SystemMessage(prompt)
-        input_msg = [system_msg] + messages
-
-        model = ChatOpenAI(
-            model="gpt-4o", 
-            temperature=0.3,
-        )
-
-        error_count = 0
-        while True:
-            response = model.invoke(input_msg)
-            
-            try:
-                res_json = json.loads(response.content)
-                response_message = res_json['assistant_message']
-                collected_data = res_json['updated_json']
-                break
-            except:
-                error_count +=1
-                if error_count > 1 :
-                    raise ValueError("모델이 올바른 JSON을 반환하지 않습니다.")
-                continue                    
-        
-        return response, response_message, collected_data
+        return response, updated_data

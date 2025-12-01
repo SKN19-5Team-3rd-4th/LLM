@@ -68,7 +68,7 @@ tools = [tool_rag_recommend, tool_rag_qna]
 ### 노드 선언 -----------------------------
 
 def node_collect(state: GraphState, collector: ModelCollect):
-    response, message, collected_data = collector.get_response(state["messages"], state["collected_data"])  # 어떤 정보를 전달했는지 알아야 하니까 collected_data도 같이 전달
+    response, collected_data = collector.get_response(state["messages"], state["collected_data"])  # 어떤 정보를 전달했는지 알아야 하니까 collected_data도 같이 전달
     
     return {
         "current_stage" : "collect",
@@ -86,7 +86,7 @@ def node_recommend(state: GraphState, recommender: ModelRecommend):
 
     return {
         "current_stage" : "recommend",
-        "messages": [response],
+        "messages": response,
         "recommend_result": recommend_result,
     }
 
