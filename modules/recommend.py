@@ -2,7 +2,7 @@
 # 2. (rag 전) get_response(): tool 호출 
 # 3. tool recommend_rag(): 벡터DB에서 검색 후 반환
 # 4. (rag 후) get_response(): 검색된 데이터를 바탕으로 LLM이 응답 생성
-from langchain_core.messages import SystemMessage, AIMessage
+from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
 from langchain_core.tools import tool
 from langchain_pinecone import PineconeVectorStore
 from langchain_openai import ChatOpenAI
@@ -23,7 +23,7 @@ class ModelRecommend:
 
             message = "입력하신 정보가 없어 오늘의 꽃으로 추천드릴게요."
 
-            with open("datas/data.json", "r", encoding='utf-8') as f :
+            with open("datas/flower_preprocessed_data.json", "r", encoding='utf-8') as f :
                 data_list = json.load(f)
 
             select_data  = None
@@ -38,7 +38,14 @@ class ModelRecommend:
             responses = [AIMessage(content=message)]
 
             ### ----------------- 프롬프트 작성해야함
-            prompt = ""
+            prompt = f"""
+                ###추천할 꽃###
+                {select_data["flowNm"]}
+
+                당신은 친절한 식물 전문가입니다. 한국어로 친절하게 답변하세요.
+                다음 식물을 3문장 이내로 추천 이유와 함께 추천하는 문장을 작성하세요.
+
+            """
 
             system_msg = SystemMessage(prompt)
             input_msg = [system_msg] + messages
@@ -90,11 +97,19 @@ class ModelRecommend:
         ).bind_tools(self.tools)
             
         recommend_result = ""
+
+        count = 1
         
-        while True:
+        while count < 4:
+            count += 1
             response = model.invoke(input_msg)
             
             if response.content == '':
+                response.tool_calls[0]['name'] = 'tool_rag_recommend'
+                collected_data_dict = {}
+                collected_data_dict['query'] = collected_data
+                response.tool_calls[0]['args'] = collected_data_dict
+
                 return response, recommend_result
 
             try:

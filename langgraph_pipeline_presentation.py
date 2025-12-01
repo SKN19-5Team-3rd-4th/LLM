@@ -52,7 +52,7 @@ initial_state = {
                 "watering_frequency": None,
                 "user_experience": None,
             },
-    "recommend_result": " "
+    "recommend_result": "칼랑코에"
 }
 ### tools 선언 ---------------------------
 # tool 함수 선언
@@ -86,7 +86,7 @@ def node_recommend(state: GraphState, recommender: ModelRecommend):
 
     return {
         "current_stage" : "recommend",
-        "messages": [response],
+        "messages": response,
         "recommend_result": recommend_result,
     }
 
@@ -160,7 +160,7 @@ def tool_back_to_caller(state: GraphState) -> str:
         print(f"[ToolMessages] [RAG] [Pinecone Index name is plant-rec]")
     elif current_state == "qna":
         print(f"[ToolMessages] [RAG] [Pinecone Index name is plant-qna]")
-    print(state["messages"][-1])
+    # print(state["messages"][-1])
 
     if current_state and current_state in ["collect", "recommend", "qna"]:
         return current_state
