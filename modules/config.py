@@ -23,7 +23,7 @@ QNA_FILE_PATH = DATA_PATH / 'post_preprocessed_data.json'
 
 # 인덱스 이름 설정
 REC_INDEX_NAME = "plant-recommend"
-QNA_INDEX_NAME = "plant-qna"
+QNA_INDEX_NAME = "plant-qna-v3"
 
 # 파인콘DB, 임베딩 모델
 pc = Pinecone(api_key=PINECONE_API_KEY)

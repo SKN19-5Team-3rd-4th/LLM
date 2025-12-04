@@ -279,9 +279,15 @@ def tool_rag_qna(query: str) -> str:
     
     # Step 3: Pinecone 인덱스 및 벡터스토어 초기화
     index = pc.Index(QNA_INDEX_NAME)
+
+    namespace = None
+    if QNA_INDEX_NAME == "plant-qna-v3":
+        namespace = f"{QNA_INDEX_NAME}-openai"
+
     vector_store = PineconeVectorStore(
         index=index,
         embedding=embeddings,
+        namespace=namespace,
     )
     
     # Step 4: 검색 수행 (필터 + fallback)
