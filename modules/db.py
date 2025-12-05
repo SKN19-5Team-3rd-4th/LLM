@@ -1,10 +1,12 @@
-from langchain_openai import OpenAIEmbeddings
-from pinecone import Pinecone, ServerlessSpec
+import base64
+from openai import OpenAI
+from pinecone import ServerlessSpec
 from datetime import datetime 
-from config import PINECONE_API_KEY, REC_INDEX_NAME, QNA_INDEX_NAME, REC_FILE_PATH, QNA_FILE_PATH, pc, embeddings
+from config import REC_INDEX_NAME, QNA_INDEX_NAME, REC_FILE_PATH, QNA_FILE_PATH, pc, embeddings, IMG_FILE_PATH, IMG_INDEX_NAME
 import pandas as pd
 import argparse
 import json
+from tqdm import tqdm
 
 
 class PineconeManager:
@@ -77,6 +79,7 @@ class PineconeRagIngestor(PineconeManager):
         print(f"[INFO] {len(self.df)}건 데이터 로드 완료")
         return self.df
     
+    # ========== 텍스트 ==========
     # 임베딩 텍스트 전처리 
     def _create_text_for_embedding(self, index_name, row):
         if REC_INDEX_NAME == index_name:
@@ -139,31 +142,78 @@ class PineconeRagIngestor(PineconeManager):
             print(f"[INFO] Batch {idx+1}")
 
         print(f"[INFO] {index_name} | {len(insert_data)}건 적재 완료")
+    
+    # ========== 이미지 ==========
+    # 이미지 -> base 64
+    def _image_to_base64(self, image_path):
+        with open(image_path, 'rb') as f:
+            return base64.b64encode(f.read()).decode('utf-8')
 
+    # 이미지 -> LLM -> 요약 text
+    def _summarize_image(self, image_path):
+        client = OpenAI()
+        system_message = "해당 이미지의 인테리어를 한국어로 자세히 설명하라."
+        
+        with open(image_path, 'rb') as f:
+            response = client.chat.completions.create(
+                model='gpt-4o',
+                messages=[
+                    {'role': 'system', 'content': system_message},
+                    {
+                        'role': 'user',
+                        'content': [
+                            {
+                                'type': 'image_url', 
+                                'image_url': {'url': f'data:image/jpeg;base64,{self._image_to_base64(image_path)}'}}]
+                    }
+                ]
+            )
+        return response.choices[0].message.content
+    
+    def upsert_image_index(self, img_path):
+        for i, fig_img_path in enumerate(tqdm(img_path)):
+            summary = self._summarize_image(fig_img_path)
+            b64 = self._image_to_base64(fig_img_path)
+            embedding = self.embeddings.embed_query(b64)
+            self.INDEX.upsert(
+                vectors=[{
+                    'id': str(i),
+                    'values': embedding,
+                    'metadata': {'img_path': fig_img_path, 'text': summary}
+                }]
+            )
+        
 
 def main():
-
     parser = argparse.ArgumentParser(description="파인콘 임베딩 데이터 적재 스크립트")
     parser.add_argument(
         "--idx",
         type=int,
         required=True,
-        choices=[0, 1], 
+        choices=[0, 1, 2], 
         help=(
             "데이터 종류 선택\n"
             "[0] 식물 추천용 데이터 (REC_FILE_PATH / REC_INDEX_NAME 사용)\n"
-            "[1] 식물 상담 QnA 데이터 (QNA_FILE_PATH / QNA_INDEX_NAME 사용)"
+            "[1] 식물 상담 QnA 데이터 (QNA_FILE_PATH / QNA_INDEX_NAME 사용)\n"
+            "[2] 인테리어 이미지 데이터 (IMG_FILE_PATH / IMG_INDEX_NAME 사용)"
         )
     )
     args = parser.parse_args()
 
-    file_path = (REC_FILE_PATH, QNA_FILE_PATH)
-    index_name = (REC_INDEX_NAME, QNA_INDEX_NAME)    
+    file_path = (REC_FILE_PATH, QNA_FILE_PATH, IMG_FILE_PATH)
+    index_name = (REC_INDEX_NAME, QNA_INDEX_NAME, IMG_INDEX_NAME)    
 
     PRI = PineconeRagIngestor()
     PRI.load_index(index_name[args.idx])
-    PRI.load_data(file_path[args.idx])
-    PRI.upsert_index(index_name[args.idx])
+    
+    # 데이터 인덱스
+    if args.idx in [0, 1]:
+        PRI.load_data(file_path[args.idx])
+        PRI.upsert_index(index_name[args.idx])
+
+    # 이미지 인덱스
+    elif args.idx == 2:
+        PRI.upsert_image_index(file_path[args.idx])
 
 
 if __name__ == "__main__":
