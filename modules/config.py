@@ -25,7 +25,7 @@ IMG_FILE_PATH =[os.path.join(IMG_PATH, f) for f in os.listdir(IMG_PATH) if f.low
 
 # 인덱스 이름 설정
 REC_INDEX_NAME = "plant-recommend"
-QNA_INDEX_NAME = "plant-qna"
+QNA_INDEX_NAME = "plant-qna-v3"
 IMG_INDEX_NAME = "plant-img"
 
 # 파인콘DB, 임베딩 모델

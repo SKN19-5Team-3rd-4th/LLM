@@ -1,74 +1,46 @@
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import StateGraph, START, END
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
-from typing import TypedDict, Annotated, Optional, Literal, List
-
+from langchain_openai import ChatOpenAI
+from langgraph.graph import StateGraph, START, END
 from functools import partial
+from typing import TypedDict, Annotated, Optional, Literal, List
 import operator
-from dotenv import load_dotenv
 
-from modules.collect import ModelCollect
 from modules.recommend import ModelRecommend, tool_rag_recommend
+from modules.collect import ModelCollect
 from modules.qna import ModelQna, tool_rag_qna
 
+from dotenv import load_dotenv
 load_dotenv()
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-# 정보 저장 state 선언 --------------------
 
+#---------------------------------------------------------------------
+# 정보 저장 State 
+#---------------------------------------------------------------------
 class GraphState(TypedDict):
     messages: Annotated[list, add_messages]                         # 모든 메시지를 저장하는 리스트
-
     current_stage: Literal["collect", "recommend", "qna", "exit"]   # 현재 어떤 작업을 하고 있는지 저장
-
     collected_data: Optional[dict]                                  # 사용자에게서 모은 데이터(정보)를 저장하는 딕셔너리
-
     recommend_result: Annotated[Optional[List[str]], operator.add]  # 사용자에게 추천한 결과(해당 추천 결과는 재추천할때에 고려하지 않게 하기 위함)
 
     # None: 아무 행동도 하지 않음, Skip: 다음 단계로, Continue: 추천 만족, Retry: 추천 다시 받기, Restart: 처음부터 재시작, QnA: QnA로 이동
     user_action: Literal["None", "Skip", "Continue", "Retry", "Restart", "QnA", "Exit"]
 
 
-initial_state = {
-    "messages": [AIMessage(content="안녕하세요. AI입니다.")],
-    "current_stage": "collect",
-    "user_action": "None",
-    "collected_data": {
-                "purpose": None,            
-                "preferred_style": None,    
-                "preferred_color": None,
-                "plant_type": None,
-                "season": None,
-                "humidity": None,
-                "has_dog": None,
-                "has_cat": None,
-                "isAirCond": None,
-                "watering_frequency": None,
-                "user_experience": None,
-                "emotion": None
-            },
-    "recommend_result": " "
-}
-### tools 선언 ---------------------------
-# tool 함수 선언
-""" 
-@tool
-def tool_func(들어갈 인자들(타입 힌트 포함)) -> str:
-    # RAG 수행
-    return string 
-"""
-# tools 에는, 각각 이미지 처리 혹은 RAG를 수행하는 세가지 함수가 들어가야 함
+#---------------------------------------------------------------------
+# tools & node 
+#---------------------------------------------------------------------
 tools = [tool_rag_recommend, tool_rag_qna]
 
-### 노드 선언 -----------------------------
-
 def node_collect(state: GraphState, collector: ModelCollect):
-    response, collected_data = collector.get_response(state["messages"], state["collected_data"])  # 어떤 정보를 전달했는지 알아야 하니까 collected_data도 같이 전달
+    # 어떤 정보를 전달했는지 알아야 하니까 collected_data도 같이 전달
+    response, collected_data = collector.get_response(state["messages"], state["collected_data"]) 
     
     return {
         "current_stage" : "collect",
@@ -77,12 +49,11 @@ def node_collect(state: GraphState, collector: ModelCollect):
     }
 
 def node_recommend(state: GraphState, recommender: ModelRecommend):
-
-    response, recommend_result = recommender.get_response(state["messages"], state["collected_data"], state["recommend_result"])  
-    # collected_data (정보를 저장한 딕셔너리) 도 같이 전달해주는 것이 낫지 않을지...
-    # 사용자에게 보여줘야할 값 : response와, 추천 결과: recommend_result를 같이 반환해줘야 할듯 (추천 결과는 다시 추천 받을때 제외하기 위함)
+    # collected_data (정보를 저장한 딕셔너리) 도 같이 전달
+    # 사용자에게 보여줘야할 값 : response와, 추천 결과: recommend_result를 같이 반환 (추천 결과는 다시 추천 받을때 제외하기 위함)
     # collected_data: dict         # 사용자에게서 모은 데이터(정보)를 저장하는 딕셔너리
     # recommend_result: List[str]  # 사용자에게 추천한 결과(해당 추천 결과는 재추천할때에 고려하지 않게 하기 위함)
+    response, recommend_result = recommender.get_response(state["messages"], state["collected_data"], state["recommend_result"])  
 
     return {
         "current_stage" : "recommend",
@@ -104,9 +75,10 @@ def node_end_state(state:GraphState):
     }
 
 
-### router 선언 -----------------------
-
-# 해당 router의 결과에 따라, 어떤 노드로 향할지 컨트롤
+#---------------------------------------------------------------------
+# router
+# - 해당 router의 결과에 따라, 어떤 노드로 향할지 컨트롤
+#---------------------------------------------------------------------
 def main_router(state: GraphState):
     stage = state["current_stage"]
     action = state["user_action"]
@@ -165,8 +137,9 @@ def tool_back_to_caller(state: GraphState) -> str:
     return "exit"
 
 
-### workflow 구현----------------------
-
+#---------------------------------------------------------------------
+# workflow
+#---------------------------------------------------------------------
 model_collect = ModelCollect(tools)
 model_recommend = ModelRecommend(tools)
 model_qna = ModelQna(tools)
@@ -222,11 +195,10 @@ workflow.add_conditional_edges(
     }
 )
 
-### 그래프 컴파일 ----------------------
-memory = MemorySaver()
-app = workflow.compile(checkpointer=memory)
 
-### 실제 구동 코드 ---------------------
+#---------------------------------------------------------------------
+# 구동 테스트
+#---------------------------------------------------------------------
 def run_chat_loop(app, memory: MemorySaver, initial_state: dict):
     thread_id_01 = "basic_user"
     config = {"configurable": {"thread_id": thread_id_01}}
@@ -264,7 +236,34 @@ def run_chat_loop(app, memory: MemorySaver, initial_state: dict):
         }
         
         response = app.invoke(input_delta, config=config)
-### -----------------------------------
+
+
+#---------------------------------------------------------------------
+# compile
+#---------------------------------------------------------------------
+memory = MemorySaver()
+app = workflow.compile(checkpointer=memory)
+
+initial_state = {
+    "messages": [AIMessage(content="안녕하세요. AI입니다.")],
+    "current_stage": "collect",
+    "user_action": "None",
+    "collected_data": {
+                "purpose": None,            
+                "preferred_style": None,    
+                "preferred_color": None,
+                "plant_type": None,
+                "season": None,
+                "humidity": None,
+                "has_dog": None,
+                "has_cat": None,
+                "isAirCond": None,
+                "watering_frequency": None,
+                "user_experience": None,
+                "emotion": None
+            },
+    "recommend_result": " "
+}
 
 if __name__ == "__main__":
     run_chat_loop(app, memory, initial_state)
