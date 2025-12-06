@@ -21,7 +21,7 @@ class ImageGenerator() :
         load_dotenv()
         self.client = OpenAI()
 
-    def image_generation_with_response(self, room_img, flower_img, prompt=None) :
+    def image_generation_with_response(self, room_img: base64, flower_img: base64, prompt=None) :
         response = self.client.responses.create(
             model="gpt-5.1",
             input=[
@@ -34,13 +34,46 @@ class ImageGenerator() :
                         },
                         {
                             "type" : "input_image",
-
+                            "image_url" : f"data:image/png;base64,{room_img}",
                         },
-                    
+                        {
+                            "type" : "input_image",
+                            "image_url" : f"data:image/png;base64,{flower_img}",
+                        },
                     ],
                 }
             ],
             tools=[{"type": "image_generation", "input_fidelity": "high"}],
         )
+
+        image_data = [
+            output.result for output in response.output
+            if output.type == "image_generation_call"
+        ]
+
+        if image_data:
+            image = base64_to_image(image_data[0])
+
+            return image
+        else: 
+            return None
+        
+    def image_generation_with_image_edit(self, room_img_path: str, flower_img_path: str, prompt=None) :
+        response = self.client.images.edit(
+            model="gpt-image-1",
+            image=[open(room_img_path, 'rb'), open(flower_img_path, 'rb')],
+            prompt=prompt,
+            input_fidelity="high",
+        )
+
+        image_base64 = response.data[0].b64_json
+        if image_base64:
+            image = base64_to_image(image_base64)
+            return image
+        else:
+            return None
+
+
+
 
 
