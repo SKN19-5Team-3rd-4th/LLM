@@ -2,15 +2,36 @@
 # 2. (rag 전) get_response(): tool 호출 
 # 3. tool recommend_rag(): 벡터DB에서 검색 후 반환
 # 4. (rag 후) get_response(): 검색된 데이터를 바탕으로 LLM이 응답 생성
-from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
+from langchain_core.messages import SystemMessage, AIMessage
 from langchain_core.tools import tool
 from langchain_pinecone import PineconeVectorStore
 from langchain_openai import ChatOpenAI
 from modules.config import REC_INDEX_NAME, pc, embeddings
 import json
+from datetime import datetime
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import torch
-from datetime import datetime
+import os
+
+RERANK_MODEL_NAME = "Dongjin-kr/ko-reranker"
+RERANK_LOCAL_DIR = "./rerank_model"
+
+# 로컬에 없으면 다운로드 후 저장
+if not os.path.exists(RERANK_LOCAL_DIR):
+    _tmp_tokenizer = AutoTokenizer.from_pretrained(RERANK_MODEL_NAME)
+    _tmp_model = AutoModelForSequenceClassification.from_pretrained(RERANK_MODEL_NAME)
+
+    os.makedirs(RERANK_LOCAL_DIR, exist_ok=True)
+    _tmp_tokenizer.save_pretrained(RERANK_LOCAL_DIR)
+    _tmp_model.save_pretrained(RERANK_LOCAL_DIR)
+
+_rerank_tokenizer = AutoTokenizer.from_pretrained(RERANK_LOCAL_DIR)
+_rerank_model = AutoModelForSequenceClassification.from_pretrained(RERANK_LOCAL_DIR)
+
+_rerank_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+_rerank_model.to(_rerank_device)
+_rerank_model.eval()
+
 
 class ModelRecommend:
     def __init__(self, tools):
@@ -126,9 +147,9 @@ class ModelRecommend:
 
 
 def _rerank(query, documents):
-    model_path = "Dongjin-kr/ko-reranker"
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForSequenceClassification.from_pretrained(model_path)
+    tokenizer = _rerank_tokenizer
+    model = _rerank_model
+    device = _rerank_device
     
     texts = [
         doc.page_content if hasattr(doc, "page_content") 
@@ -144,7 +165,7 @@ def _rerank(query, documents):
         padding=True, 
         truncation=True, 
         return_tensors='pt'
-    )
+    ).to(device)
     
     with torch.no_grad():
         outputs = model(**inputs)
