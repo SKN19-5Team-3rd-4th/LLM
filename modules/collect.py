@@ -5,15 +5,15 @@ import json
 import streamlit as st
 
 collected_data = {
-                "room": "거실 / 거실의 빈 벽이 너무 심심해서 놓고 싶어",
-                "humidity": "건조",
-                "preferred_style": "미니멀",
-                "preferred_color": "따뜻한 색",
-                "has_dog": True,
-                "has_cat": False,
-                "isAirCond": True,
-                "watering_frequency": "주 1회",
-                "user_experience": "쉬움"
+                "room": None,
+                "humidity": None,
+                "preferred_style": None,
+                "preferred_color": None,
+                "has_dog": None,
+                "has_cat": None,
+                "isAirCond": None,
+                "watering_frequency": None,
+                "user_experience": None
             }
 
 class ModelCollect:
