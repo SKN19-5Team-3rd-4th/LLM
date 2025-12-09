@@ -5,7 +5,7 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
 from langchain_core.messages import SystemMessage
-from modules.config import *
+from config import *
 from langchain_pinecone import PineconeVectorStore
 import json
 

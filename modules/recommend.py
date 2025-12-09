@@ -6,7 +6,7 @@ from langchain_core.messages import SystemMessage, AIMessage
 from langchain_core.tools import tool
 from langchain_pinecone import PineconeVectorStore
 from langchain_openai import ChatOpenAI
-from modules.config import REC_INDEX_NAME, pc, embeddings
+from config import REC_INDEX_NAME, pc, embeddings
 import json
 from datetime import datetime
 from transformers import AutoModelForSequenceClassification, AutoTokenizer

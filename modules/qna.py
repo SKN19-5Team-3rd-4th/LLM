@@ -2,7 +2,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.tools import tool
 from langchain_pinecone import PineconeVectorStore
 from langchain_openai import ChatOpenAI
-from modules.config import QNA_INDEX_NAME, pc, embeddings
+from config import QNA_INDEX_NAME, pc, embeddings
 import json
 
 
